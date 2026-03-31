@@ -925,5 +925,24 @@ function removeRotSlot(key, i) {
 // ═══ INIT ═══
 try { renderHome(); } catch(e) { console.error('renderHome error:', e); }
 </script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/noamworkoutapp/sw.js').then(function(reg) {
+      reg.addEventListener('updatefound', function() {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', function() {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            if (confirm('App updated! Reload to get the latest version?')) {
+              window.location.reload();
+            }
+          }
+        });
+      });
+    });
+  });
+}
+</script>
 </body>
 </html>
