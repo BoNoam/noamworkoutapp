@@ -406,6 +406,16 @@ let workoutLog = ls('lft_log', []);
 let prs       = ls('lft_prs', {});
 let rotCounters = ls('lft_rot_counters', {push:0, pull:0});
 
+// ═══ MIGRATE old schedule values ═══
+(function() {
+  const migMap = {push:'push-a', pull:'pull-a'};
+  let changed = false;
+  Object.keys(schedule).forEach(d => {
+    if (migMap[schedule[d]]) { schedule[d] = migMap[schedule[d]]; changed = true; }
+  });
+  if (changed) ss('lft_schedule', schedule);
+})();
+
 // Active workout state
 let activeWorkout = null;
 
@@ -909,7 +919,7 @@ function removeRotSlot(key, i) {
 }
 
 // ═══ INIT ═══
-renderHome();
+try { renderHome(); } catch(e) { console.error('renderHome error:', e); }
 </script>
 </body>
 </html>
