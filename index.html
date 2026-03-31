@@ -144,6 +144,7 @@ canvas { display: block; width: 100% !important; }
     <div style="padding:12px 16px 0">
       <div class="today-hero">
         <div class="today-day-label" id="home-date-label">Today</div>
+        <div id="home-plan-reminder" style="margin-bottom:10px"></div>
         <div style="margin-bottom:14px">
           <select id="workout-picker" style="font-family:var(--font-display);font-size:22px;letter-spacing:0.04em;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);width:100%;color:var(--text)">
             <option value="">Select workout...</option>
@@ -204,7 +205,20 @@ canvas { display: block; width: 100% !important; }
   </div>
   <div class="scroll-area">
     <div id="history-list"></div>
-    <div id="history-cal" style="display:none"></div>
+    <div id="history-cal" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <button onclick="calMonthOffset--; renderHistoryCal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:18px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center">&#8249;</button>
+        <div id="cal-month-label" style="font-size:13px;font-weight:500;color:var(--text)"></div>
+        <button onclick="calMonthOffset++; if(calMonthOffset>0) calMonthOffset=0; renderHistoryCal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:18px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center">&#8250;</button>
+      </div>
+      <div id="cal-grid"></div>
+      <div id="cal-legend" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:2px;background:var(--push)"></div>Push</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:2px;background:var(--pull)"></div>Pull</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:2px;background:var(--legs)"></div>Legs</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:2px;background:var(--run)"></div>Run</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -219,6 +233,11 @@ canvas { display: block; width: 100% !important; }
   <div class="topbar"><div class="topbar-title">SETUP</div></div>
   <div class="scroll-area">
 
+    <div class="card mb12">
+      <div class="section-header"><span class="section-label">Weekly Plan</span></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Sets your daily reminder on the home screen</div>
+      <div id="schedule-rows"></div>
+    </div>
     <div class="card mb12">
       <div class="section-header">
         <span class="section-label">Exercise Library</span>
@@ -337,7 +356,7 @@ function ss(k, v) {
   try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {}
 }
 
-// schedule removed — user picks workout type on the fly
+var schedule = ls('lft_schedule', {Mon:'push-a',Tue:'pull-a',Wed:'run',Thu:'push-b',Fri:'pull-b',Sat:'legs',Sun:'run'});
 var exercises  = ls('lft_exercises', []);
 var rotations  = ls('lft_rotations', {'push-a':[],'push-b':[],'pull-a':[],'pull-b':[],'legs':[]});
 var workoutLog = ls('lft_log',       []);
@@ -402,6 +421,22 @@ function navigate(pg) {
 // ── HOME ─────────────────────────────────────────────
 function renderHome() {
   var today = new Date();
+  // Show today's plan reminder
+  var todayIdx  = (new Date().getDay() + 6) % 7;
+  var todayName = DAYS[todayIdx];
+  var planned   = schedule[todayName] || 'rest';
+  var reminderEl = document.getElementById('home-plan-reminder');
+  if (planned !== 'rest') {
+    var planColor = planned.indexOf('push') === 0 ? 'var(--push)' :
+                    planned.indexOf('pull') === 0 ? 'var(--pull)' :
+                    planned === 'legs'             ? 'var(--legs)' :
+                    planned === 'run'              ? 'var(--run)'  : 'var(--muted)';
+    reminderEl.innerHTML = '<span style="font-size:11px;color:var(--muted)">Planned: </span>' +
+      '<span style="font-size:12px;font-weight:500;color:' + planColor + '">' + typeLabel(planned) + '</span>';
+  } else {
+    reminderEl.innerHTML = '<span style="font-size:11px;color:var(--muted)">Rest day planned</span>';
+  }
+
   document.getElementById('home-date-label').textContent =
     today.toLocaleDateString('en-CA', {weekday:'long', month:'long', day:'numeric'});
 
@@ -643,6 +678,7 @@ function endWorkout() {
 
 // ── HISTORY ──────────────────────────────────────────
 var historyView = 'list';
+var calMonthOffset = 0;
 
 function setHistoryView(v) {
   historyView = v;
@@ -665,6 +701,7 @@ function setHistoryView(v) {
     btnList.style.color      = 'var(--muted)';
     btnCal.style.background  = 'var(--accent)';
     btnCal.style.color       = '#0a0a0a';
+    calMonthOffset = 0;
     renderHistoryCal();
   }
 }
@@ -685,148 +722,92 @@ function renderHistoryList() {
 }
 
 function renderHistoryCal() {
-  var cal = document.getElementById('history-cal');
-  cal.innerHTML = '';
-
-  // Build a map of date -> workout type(s)
   var dateMap = {};
   workoutLog.forEach(function(w) {
     if (!dateMap[w.date]) dateMap[w.date] = [];
     dateMap[w.date].push(w);
   });
 
-  // Show last 4 months including current
   var today = new Date();
-  var months = [];
-  for (var m = 3; m >= 0; m--) {
-    var d = new Date(today.getFullYear(), today.getMonth() - m, 1);
-    months.push({ year: d.getFullYear(), month: d.getMonth() });
+  var yr  = new Date(today.getFullYear(), today.getMonth() + calMonthOffset, 1).getFullYear();
+  var mo  = new Date(today.getFullYear(), today.getMonth() + calMonthOffset, 1).getMonth();
+
+  document.getElementById('cal-month-label').textContent =
+    new Date(yr, mo, 1).toLocaleDateString('en-CA', {month:'long', year:'numeric'});
+
+  var grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:3px';
+
+  // Day of week headers
+  ['M','T','W','T','F','S','S'].forEach(function(d) {
+    var h = document.createElement('div');
+    h.style.cssText = 'text-align:center;font-size:9px;color:var(--muted);padding-bottom:4px';
+    h.textContent = d;
+    grid.appendChild(h);
+  });
+
+  var firstDay   = (new Date(yr, mo, 1).getDay() + 6) % 7;
+  var daysInMonth = new Date(yr, mo + 1, 0).getDate();
+  var todayStr   = today.toLocaleDateString('en-CA');
+
+  for (var i = 0; i < firstDay; i++) {
+    grid.appendChild(document.createElement('div'));
   }
 
-  months.forEach(function(mo) {
-    var monthName = new Date(mo.year, mo.month, 1).toLocaleDateString('en-CA', {month:'long', year:'numeric'});
-    var block = document.createElement('div');
-    block.style.marginBottom = '20px';
+  for (var day = 1; day <= daysInMonth; day++) {
+    var dateStr  = yr + '-' + String(mo + 1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+    var workouts = dateMap[dateStr] || [];
+    var isToday  = dateStr === todayStr;
+    var isFuture = new Date(yr, mo, day) > today;
 
-    // Month label
-    var mlbl = document.createElement('div');
-    mlbl.style.cssText = 'font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:8px;font-weight:500';
-    mlbl.textContent = monthName;
-    block.appendChild(mlbl);
+    var cell = document.createElement('div');
+    cell.style.cssText = 'aspect-ratio:1;border-radius:5px;display:flex;align-items:center;justify-content:center;position:relative';
 
-    // Day-of-week headers
-    var DOW = ['M','T','W','T','F','S','S'];
-    var grid = document.createElement('div');
-    grid.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:4px';
+    var numEl = document.createElement('div');
+    numEl.style.cssText = 'font-size:12px;font-weight:500;';
+    numEl.textContent = day;
 
-    DOW.forEach(function(d) {
-      var h = document.createElement('div');
-      h.style.cssText = 'text-align:center;font-size:9px;color:var(--muted);padding-bottom:2px';
-      h.textContent = d;
-      grid.appendChild(h);
-    });
-
-    // First day of month (Mon=0 offset)
-    var firstDay = new Date(mo.year, mo.month, 1).getDay();
-    var offset = (firstDay + 6) % 7; // Mon-based
-    var daysInMonth = new Date(mo.year, mo.month + 1, 0).getDate();
-
-    // Empty cells before first day
-    for (var i = 0; i < offset; i++) {
-      var empty = document.createElement('div');
-      grid.appendChild(empty);
+    if (workouts.length) {
+      var wtype = workouts[0].type;
+      var color = wtype.indexOf('push') === 0 ? 'var(--push)' :
+                  wtype.indexOf('pull') === 0 ? 'var(--pull)' :
+                  wtype === 'legs'             ? 'var(--legs)' :
+                  wtype === 'run'              ? 'var(--run)'  : 'var(--muted)';
+      var bg    = wtype.indexOf('push') === 0 ? 'rgba(255,107,53,0.25)' :
+                  wtype.indexOf('pull') === 0 ? 'rgba(71,168,255,0.25)' :
+                  wtype === 'legs'             ? 'rgba(180,127,255,0.25)' :
+                  wtype === 'run'              ? 'rgba(71,255,180,0.25)' : 'rgba(136,136,136,0.2)';
+      cell.style.background = bg;
+      cell.style.border     = '1px solid ' + color;
+      numEl.style.color     = color;
+      cell.style.cursor     = 'pointer';
+      cell.onclick = (function(ws) {
+        return function() { showHistoryDetail(workoutUID(ws[0])); };
+      }(workouts));
+    } else {
+      cell.style.background = isFuture ? 'transparent' : 'var(--surface2)';
+      cell.style.border     = '1px solid ' + (isFuture ? 'transparent' : 'var(--border)');
+      numEl.style.color     = isFuture ? 'var(--surface3)' : 'var(--muted)';
     }
 
-    // Day cells
-    for (var day = 1; day <= daysInMonth; day++) {
-      var dateStr = mo.year + '-' +
-        String(mo.month + 1).padStart(2, '0') + '-' +
-        String(day).padStart(2, '0');
-      var workouts = dateMap[dateStr] || [];
-      var isToday  = (dateStr === today.toLocaleDateString('en-CA'));
-      var isFuture = (new Date(mo.year, mo.month, day) > today);
+    if (isToday) { cell.style.outline = '2px solid var(--accent)'; cell.style.outlineOffset = '1px'; }
 
-      var cell = document.createElement('div');
-      cell.style.cssText = 'aspect-ratio:1;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;cursor:' + (workouts.length ? 'pointer' : 'default') + ';';
+    cell.appendChild(numEl);
+    grid.appendChild(cell);
+  }
 
-      if (workouts.length) {
-        // Color by first workout type
-        var wtype = workouts[0].type;
-        var color = wtype.indexOf('push') === 0 ? 'var(--push)' :
-                    wtype.indexOf('pull') === 0 ? 'var(--pull)' :
-                    wtype === 'legs'             ? 'var(--legs)' :
-                    wtype === 'run'              ? 'var(--run)'  : 'var(--muted)';
-        var bgAlpha = wtype.indexOf('push') === 0 ? 'rgba(255,107,53,0.25)' :
-                      wtype.indexOf('pull') === 0 ? 'rgba(71,168,255,0.25)' :
-                      wtype === 'legs'             ? 'rgba(180,127,255,0.25)' :
-                      wtype === 'run'              ? 'rgba(71,255,180,0.25)' : 'rgba(136,136,136,0.2)';
-        cell.style.background = bgAlpha;
-        cell.style.border     = '1px solid ' + color;
-
-        var dayNum = document.createElement('div');
-        dayNum.style.cssText = 'font-size:11px;font-weight:500;color:' + color;
-        dayNum.textContent = day;
-        cell.appendChild(dayNum);
-
-        // Dot for each workout if more than one
-        if (workouts.length > 1) {
-          var dots = document.createElement('div');
-          dots.style.cssText = 'display:flex;gap:2px;margin-top:1px';
-          workouts.slice(0, 3).forEach(function() {
-            var dot = document.createElement('div');
-            dot.style.cssText = 'width:3px;height:3px;border-radius:50%;background:' + color;
-            dots.appendChild(dot);
-          });
-          cell.appendChild(dots);
-        }
-
-        cell.onclick = (function(ws) {
-          return function() {
-            ws.forEach(function(w) { showHistoryDetail(workoutUID(w)); });
-          };
-        }(workouts));
-
-      } else {
-        cell.style.background = isFuture ? 'transparent' : 'var(--surface2)';
-        cell.style.border     = '1px solid ' + (isFuture ? 'transparent' : 'var(--border)');
-        var dayNum = document.createElement('div');
-        dayNum.style.cssText = 'font-size:11px;color:' + (isFuture ? 'var(--surface3)' : 'var(--muted)');
-        dayNum.textContent = day;
-        cell.appendChild(dayNum);
-      }
-
-      if (isToday) {
-        cell.style.outline = '2px solid var(--accent)';
-        cell.style.outlineOffset = '1px';
-      }
-
-      grid.appendChild(cell);
-    }
-
-    block.appendChild(grid);
-
-    // Legend for this month
-    var worked = Object.keys(dateMap).filter(function(d) {
-      return d.slice(0,7) === (mo.year + '-' + String(mo.month+1).padStart(2,'0'));
-    }).length;
-    var legend = document.createElement('div');
-    legend.style.cssText = 'font-size:11px;color:var(--muted);margin-top:6px';
-    legend.textContent = worked + ' workout' + (worked !== 1 ? 's' : '') + ' this month';
-    block.appendChild(legend);
-
-    cal.appendChild(block);
-  });
-
-  // Color legend
-  var leg = document.createElement('div');
-  leg.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;padding-top:12px;border-top:1px solid var(--border)';
-  [['push','var(--push)','Push'],['pull','var(--pull)','Pull'],['legs','var(--legs)','Legs'],['run','var(--run)','Run']].forEach(function(item) {
-    var el = document.createElement('div');
-    el.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)';
-    el.innerHTML = '<div style="width:10px;height:10px;border-radius:2px;background:' + item[1] + '"></div>' + item[2];
-    leg.appendChild(el);
-  });
-  cal.appendChild(leg);
+  // Month count
+  var moKey = yr + '-' + String(mo + 1).padStart(2,'0');
+  var worked = Object.keys(dateMap).filter(function(d) { return d.slice(0,7) === moKey; }).length;
+  var countEl = document.getElementById('cal-count');
+  if (!countEl) {
+    countEl = document.createElement('div');
+    countEl.id = 'cal-count';
+    countEl.style.cssText = 'font-size:11px;color:var(--muted);margin-top:8px;text-align:center';
+    document.getElementById('history-cal').insertBefore(countEl, document.getElementById('cal-legend'));
+  }
+  countEl.textContent = worked + ' workout' + (worked !== 1 ? 's' : '') + ' this month';
 }
 
 function showHistoryDetail(id) {
@@ -961,6 +942,33 @@ function makeChart(id, labels, data, color, unit) {
 
 // ── SETUP ────────────────────────────────────────────
 function renderSetup() {
+  // Schedule rows
+  var rows = document.getElementById('schedule-rows');
+  if (rows) {
+    rows.innerHTML = '';
+    DAYS.forEach(function(d) {
+      var row = document.createElement('div');
+      row.className = 'setup-day-row';
+      var lbl = document.createElement('div');
+      lbl.className = 'setup-day-label';
+      lbl.textContent = d;
+      var sel = document.createElement('select');
+      SCHED_OPTS.forEach(function(pair) {
+        var opt = document.createElement('option');
+        opt.value = pair[0];
+        opt.textContent = pair[1];
+        if (schedule[d] === pair[0]) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.onchange = (function(day) {
+        return function() { schedule[day] = this.value; ss('lft_schedule', schedule); renderHome(); };
+      }(d));
+      row.appendChild(lbl);
+      row.appendChild(sel);
+      rows.appendChild(row);
+    });
+  }
+
   renderExLib();
   ['push-a','push-b','pull-a','pull-b','legs'].forEach(renderRotation);
 }
@@ -997,6 +1005,33 @@ function saveNewExercise() {
   ss('lft_exercises', exercises);
   closeModal('modal-add-ex');
   document.getElementById('new-ex-name').value = '';
+  // Schedule rows
+  var rows = document.getElementById('schedule-rows');
+  if (rows) {
+    rows.innerHTML = '';
+    DAYS.forEach(function(d) {
+      var row = document.createElement('div');
+      row.className = 'setup-day-row';
+      var lbl = document.createElement('div');
+      lbl.className = 'setup-day-label';
+      lbl.textContent = d;
+      var sel = document.createElement('select');
+      SCHED_OPTS.forEach(function(pair) {
+        var opt = document.createElement('option');
+        opt.value = pair[0];
+        opt.textContent = pair[1];
+        if (schedule[d] === pair[0]) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.onchange = (function(day) {
+        return function() { schedule[day] = this.value; ss('lft_schedule', schedule); renderHome(); };
+      }(d));
+      row.appendChild(lbl);
+      row.appendChild(sel);
+      rows.appendChild(row);
+    });
+  }
+
   renderExLib();
   ['push-a','push-b','pull-a','pull-b','legs'].forEach(renderRotation);
 }
@@ -1010,6 +1045,33 @@ function deleteExercise(i) {
     rotations[k] = rotations[k].filter(function(x) { return x !== exId; });
   });
   ss('lft_rotations', rotations);
+  // Schedule rows
+  var rows = document.getElementById('schedule-rows');
+  if (rows) {
+    rows.innerHTML = '';
+    DAYS.forEach(function(d) {
+      var row = document.createElement('div');
+      row.className = 'setup-day-row';
+      var lbl = document.createElement('div');
+      lbl.className = 'setup-day-label';
+      lbl.textContent = d;
+      var sel = document.createElement('select');
+      SCHED_OPTS.forEach(function(pair) {
+        var opt = document.createElement('option');
+        opt.value = pair[0];
+        opt.textContent = pair[1];
+        if (schedule[d] === pair[0]) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.onchange = (function(day) {
+        return function() { schedule[day] = this.value; ss('lft_schedule', schedule); renderHome(); };
+      }(d));
+      row.appendChild(lbl);
+      row.appendChild(sel);
+      rows.appendChild(row);
+    });
+  }
+
   renderExLib();
   ['push-a','push-b','pull-a','pull-b','legs'].forEach(renderRotation);
 }
