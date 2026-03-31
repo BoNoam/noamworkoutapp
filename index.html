@@ -399,7 +399,7 @@ const MUSCLE_COLORS = {
 function ls(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }
 function ss(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
-let schedule  = ls('lft_schedule', {Mon:'push',Tue:'pull',Wed:'run',Thu:'push',Fri:'pull',Sat:'legs',Sun:'run'});
+let schedule  = ls('lft_schedule', {Mon:'push-a',Tue:'pull-a',Wed:'run',Thu:'push-b',Fri:'pull-b',Sat:'legs',Sun:'run'});
 let exercises = ls('lft_exercises', []);
 let rotations = ls('lft_rotations', {'push-a':[],'push-b':[],'pull-a':[],'pull-b':[],'legs':[]});
 let workoutLog = ls('lft_log', []);
@@ -446,7 +446,7 @@ function renderHome() {
   const strip = document.getElementById('week-strip');
   strip.innerHTML = DAYS.map((d, i) => {
     const t = schedule[d] || 'rest';
-    const cls = t.startsWith('push')?'push':t.startsWith('pull')?'pull':t==='legs'?'legs':t==='run'?'run':'';
+    const cls = t.startsWith('push-')||t==='push'?'push':t.startsWith('pull-')||t==='pull'?'pull':t==='legs'?'legs':t==='run'?'run':'';
     const isToday = i === dayIdx;
     const abbr = t === 'run' ? 'RUN' : t.startsWith('push') ? 'PSH' : t.startsWith('pull') ? 'PLL' : t === 'legs' ? 'LEG' : 'RST';
     return `<div class="week-dot">
@@ -477,17 +477,8 @@ function summaryText(w) {
 
 // ═══ START WORKOUT ═══
 function startWorkout(dayName) {
-  const type = schedule[dayName];
-  let variant = type;
-  if (type === 'push') {
-    variant = TYPE_CYCLE.push[rotCounters.push % 2];
-    rotCounters.push++;
-    ss('lft_rot_counters', rotCounters);
-  } else if (type === 'pull') {
-    variant = TYPE_CYCLE.pull[rotCounters.pull % 2];
-    rotCounters.pull++;
-    ss('lft_rot_counters', rotCounters);
-  }
+  const variant = schedule[dayName];
+  const type = variant.startsWith('push') ? 'push' : variant.startsWith('pull') ? 'pull' : variant;
 
   activeWorkout = {
     dayName, type, variant,
@@ -806,15 +797,11 @@ function makeChart(id, labels, data, color, unit) {
 function renderSetup() {
   // Schedule
   const rows = document.getElementById('schedule-rows');
-  rows.innerHTML = DAYS.map(d => `
-    <div class="setup-day-row">
-      <div class="setup-day-label">${d}</div>
-      <select onchange="schedule['${d}']=this.value;ss('lft_schedule',schedule);renderHome()">
-        ${['push','pull','legs','run','rest'].map(t =>
-          `<option value="${t}" ${schedule[d]===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`
-        ).join('')}
-      </select>
-    </div>`).join('');
+  const schedOpts = [['push-a','Push A'],['push-b','Push B'],['pull-a','Pull A'],['pull-b','Pull B'],['legs','Legs'],['run','Run'],['rest','Rest']];
+  rows.innerHTML = DAYS.map(d => {
+    const opts = schedOpts.map(([val,lbl]) => '<option value="' + val + '"' + (schedule[d]===val?' selected':'') + '>' + lbl + '</option>').join('');
+    return '<div class="setup-day-row"><div class="setup-day-label">' + d + '</div><select onchange="schedule['' + d + '']=this.value;ss('lft_schedule',schedule);renderHome()">' + opts + '</select></div>';
+  }).join('');
 
   // Exercise library
   renderExLib();
