@@ -459,7 +459,7 @@ function renderHome() {
     homeRecent.innerHTML = '<div class="section-label" style="margin-bottom:8px">Recent</div>' +
       recent.map(w => `<div class="history-entry" onclick="showHistoryDetail(${workoutLog.indexOf(w)})">
         <div class="history-entry-top"><span class="history-date">${w.date}</span><span class="pill pill-${w.type.startsWith('push')?'push':w.type.startsWith('pull')?'pull':w.type==='legs'?'legs':'run'}">${w.type.toUpperCase()}</span></div>
-        <div class="history-title">${w.type==='run'?'Run':'${w.type.toUpperCase()}'}</div>
+        <div class="history-title">${w.type==='run'?'RUN':w.type.toUpperCase()}</div>
         <div class="history-summary">${summaryText(w)}</div>
       </div>`).join('');
   } else {
@@ -500,7 +500,14 @@ function startWorkout(dayName) {
   } else {
     const rotKey = variant;
     const rot = rotations[rotKey] || [];
-    activeWorkout.exerciseList = rot.map(id => exercises.find(e => e.id === id)).filter(Boolean);
+    const list = rot.map(id => exercises.find(e => e.id === id)).filter(Boolean);
+    if (!list.length) {
+      activeWorkout = null;
+      const label = rotKey === 'push-a' ? 'Push Day A' : rotKey === 'push-b' ? 'Push Day B' : rotKey === 'pull-a' ? 'Pull Day A' : rotKey === 'pull-b' ? 'Pull Day B' : 'Legs';
+      alert('No exercises in your ' + label + ' rotation yet.\n\nGo to Setup → add exercises to the library → then add them to your ' + label + ' rotation.');
+      return;
+    }
+    activeWorkout.exerciseList = list;
     startLiftWorkout();
   }
 }
@@ -690,8 +697,17 @@ function showHistoryDetail(idx) {
         </div>`).join('')}
       </div>`).join('');
   }
+  html += `<button class="btn btn-danger btn-full" style="margin-top:8px" onclick="deleteWorkout(${idx})">Delete Workout</button>`;
   document.getElementById('history-detail-content').innerHTML = html;
   document.getElementById('modal-history-detail').classList.remove('hidden');
+}
+
+function deleteWorkout(idx) {
+  if (!confirm('Delete this workout? This cannot be undone.')) return;
+  workoutLog.splice(idx, 1);
+  ss('lft_log', workoutLog);
+  closeModal('modal-history-detail');
+  renderHistory();
 }
 
 // ═══ STATS ═══
