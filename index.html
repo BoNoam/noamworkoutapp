@@ -808,9 +808,13 @@ function renderSetup() {
   // Schedule
   const rows = document.getElementById('schedule-rows');
   const schedOpts = [['push-a','Push A'],['push-b','Push B'],['pull-a','Pull A'],['pull-b','Pull B'],['legs','Legs'],['run','Run'],['rest','Rest']];
-  rows.innerHTML = DAYS.map(d => {
-    const opts = schedOpts.map(([val,lbl]) => '<option value="' + val + '"' + (schedule[d]===val?' selected':'') + '>' + lbl + '</option>').join('');
-    return '<div class="setup-day-row"><div class="setup-day-label">' + d + '</div><select onchange="schedule['' + d + '']=this.value;ss('lft_schedule',schedule);renderHome()">' + opts + '</select></div>';
+  rows.innerHTML = DAYS.map(function(d) {
+    var opts = schedOpts.map(function(pair) {
+      var val = pair[0], lbl = pair[1];
+      return '<option value="' + val + '"' + (schedule[d]===val ? ' selected' : '') + '>' + lbl + '</option>';
+    }).join('');
+    var onch = 'schedule[\'' + d + '\']=this.value;ss(\'lft_schedule\',schedule);renderHome()';
+    return '<div class="setup-day-row"><div class="setup-day-label">' + d + '</div><select onchange="' + onch + '">' + opts + '</select></div>';
   }).join('');
 
   // Exercise library
