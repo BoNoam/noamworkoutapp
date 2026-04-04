@@ -260,7 +260,10 @@ canvas { display: block; width: 100% !important; }
     <div class="card mb12">
       <div class="section-header">
         <span class="section-label">Exercise Library</span>
-        <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="openAddExModal()">+ Add</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="loadDefaultExercises()">Load defaults</button>
+          <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="openAddExModal()">+ Add</button>
+        </div>
       </div>
       <div id="ex-lib-list"></div>
     </div>
@@ -1078,6 +1081,56 @@ function renderSetup() {
 
   renderExLib();
   ['push','pull','legs'].forEach(renderRotation);
+}
+
+function loadDefaultExercises() {
+  var defaults = [
+    {name:'Dumbbell Press',           muscle:'chest',     cat:'push'},
+    {name:'Incline Dumbbell Press',   muscle:'chest',     cat:'push'},
+    {name:'Cable Flyes',              muscle:'chest',     cat:'push'},
+    {name:'Machine Flyes',            muscle:'chest',     cat:'push'},
+    {name:'Push Ups',                 muscle:'chest',     cat:'push'},
+    {name:'Dips',                     muscle:'chest',     cat:'push'},
+    {name:'Pull Ups',                 muscle:'back',      cat:'pull'},
+    {name:'Lat Pulldown',             muscle:'back',      cat:'pull'},
+    {name:'Lat Pulldown (Single Arm)',muscle:'back',      cat:'pull'},
+    {name:'Cable Rows',               muscle:'back',      cat:'pull'},
+    {name:'Cable Rows (Single Arm)',  muscle:'back',      cat:'pull'},
+    {name:'Shrugs',                   muscle:'back',      cat:'pull'},
+    {name:'Lat Pullovers',            muscle:'back',      cat:'pull'},
+    {name:'Tricep Pushdown',          muscle:'triceps',   cat:'push'},
+    {name:'Tricep Extension',         muscle:'triceps',   cat:'push'},
+    {name:'Tricep Kickbacks',         muscle:'triceps',   cat:'push'},
+    {name:'Skull Crusher',            muscle:'triceps',   cat:'push'},
+    {name:'Cable Curls',              muscle:'biceps',    cat:'pull'},
+    {name:'Hammer Curls',             muscle:'biceps',    cat:'pull'},
+    {name:'Spider/Preacher Curls',    muscle:'biceps',    cat:'pull'},
+    {name:'Chin Ups',                 muscle:'biceps',    cat:'pull'},
+    {name:'Lateral Raises',           muscle:'shoulders', cat:'push'},
+    {name:'Rear Delt Flyes',          muscle:'shoulders', cat:'push'},
+    {name:'Shoulder Press',           muscle:'shoulders', cat:'push'},
+    {name:'Squat',                    muscle:'legs',      cat:'legs'},
+    {name:'Bulgarian Split Squat',    muscle:'legs',      cat:'legs'},
+    {name:'Leg Press',                muscle:'legs',      cat:'legs'},
+    {name:'Leg Curls',                muscle:'legs',      cat:'legs'},
+    {name:'Calf Raises',              muscle:'legs',      cat:'legs'},
+    {name:'Leg Raises',               muscle:'abs',       cat:'other'},
+    {name:'Corkscrew',                muscle:'abs',       cat:'other'},
+    {name:'Cable Crunch',             muscle:'abs',       cat:'other'},
+  ];
+  var existingNames = exercises.map(function(e) { return e.name.toLowerCase(); });
+  var added = 0;
+  defaults.forEach(function(d) {
+    if (existingNames.indexOf(d.name.toLowerCase()) === -1) {
+      exercises.push({ id: uid(), name: d.name, muscle: d.muscle, cat: d.cat });
+      added++;
+    }
+  });
+  ss('lft_exercises', exercises);
+  renderExLib();
+  ['push','pull','legs'].forEach(renderRotation);
+  if (added > 0) alert(added + ' exercise' + (added > 1 ? 's' : '') + ' added.');
+  else alert('All defaults are already in your library.');
 }
 
 function renderExLib() {
