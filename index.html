@@ -246,32 +246,20 @@ canvas { display: block; width: 100% !important; }
       <div id="ex-lib-list"></div>
     </div>
     <div class="card mb12">
-      <div class="section-header"><span class="section-label">Push Day A</span></div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Chest first</div>
-      <div id="rot-push-a"></div>
-      <button class="btn btn-ghost mt8" style="font-size:12px;padding:7px 12px;width:100%" onclick="addRotSlot('push-a')">+ Add exercise</button>
+      <div class="section-header"><span class="section-label">Push Exercises</span></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">A: chest first, then arms &amp; shoulders &mdash; B: arms &amp; shoulders first, then chest. Order within each group is randomized.</div>
+      <div id="rot-push"></div>
+      <button class="btn btn-ghost mt8" style="font-size:12px;padding:7px 12px;width:100%" onclick="addRotSlot('push')">+ Add exercise</button>
     </div>
     <div class="card mb12">
-      <div class="section-header"><span class="section-label">Push Day B</span></div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Triceps and shoulders first</div>
-      <div id="rot-push-b"></div>
-      <button class="btn btn-ghost mt8" style="font-size:12px;padding:7px 12px;width:100%" onclick="addRotSlot('push-b')">+ Add exercise</button>
+      <div class="section-header"><span class="section-label">Pull Exercises</span></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">A: back first, then biceps &amp; shoulders &mdash; B: biceps &amp; shoulders first, then back. Order within each group is randomized.</div>
+      <div id="rot-pull"></div>
+      <button class="btn btn-ghost mt8" style="font-size:12px;padding:7px 12px;width:100%" onclick="addRotSlot('pull')">+ Add exercise</button>
     </div>
     <div class="card mb12">
-      <div class="section-header"><span class="section-label">Pull Day A</span></div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Back first</div>
-      <div id="rot-pull-a"></div>
-      <button class="btn btn-ghost mt8" style="font-size:12px;padding:7px 12px;width:100%" onclick="addRotSlot('pull-a')">+ Add exercise</button>
-    </div>
-    <div class="card mb12">
-      <div class="section-header"><span class="section-label">Pull Day B</span></div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Biceps and shoulders first</div>
-      <div id="rot-pull-b"></div>
-      <button class="btn btn-ghost mt8" style="font-size:12px;padding:7px 12px;width:100%" onclick="addRotSlot('pull-b')">+ Add exercise</button>
-    </div>
-    <div class="card mb12">
-      <div class="section-header"><span class="section-label">Legs Day</span></div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">All leg exercises</div>
+      <div class="section-header"><span class="section-label">Legs Exercises</span></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">All leg exercises, randomized order</div>
       <div id="rot-legs"></div>
       <button class="btn btn-ghost mt8" style="font-size:12px;padding:7px 12px;width:100%" onclick="addRotSlot('legs')">+ Add exercise</button>
     </div>
@@ -317,7 +305,6 @@ canvas { display: block; width: 100% !important; }
         <option value="shoulders">Shoulders</option>
         <option value="back">Back</option>
         <option value="biceps">Biceps</option>
-        <option value="rear-delts">Rear Delts</option>
         <option value="legs">Legs</option>
         <option value="abs">Abs</option>
       </select>
@@ -363,7 +350,7 @@ function ss(k, v) {
 
 var schedule = ls('lft_schedule', {Mon:'push-a',Tue:'pull-a',Wed:'run',Thu:'push-b',Fri:'pull-b',Sat:'legs',Sun:'run'});
 var exercises  = ls('lft_exercises', []);
-var rotations  = ls('lft_rotations', {'push-a':[],'push-b':[],'pull-a':[],'pull-b':[],'legs':[],'abs':[]});
+var rotations  = ls('lft_rotations', {'push':[],'pull':[],'legs':[],'abs':[]});
 var workoutLog = ls('lft_log',       []);
 var prs        = ls('lft_prs',       {});
 
@@ -481,6 +468,63 @@ function renderHome() {
   }
 }
 
+function shuffle(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+function buildExerciseList(variant) {
+  var baseKey = variant === 'push-a' || variant === 'push-b' ? 'push' :
+                variant === 'pull-a' || variant === 'pull-b' ? 'pull' :
+                variant; // legs
+
+  var rot = rotations[baseKey] || [];
+  var exList = rot.map(function(id) { return exercises.find(function(e) { return e.id === id; }); }).filter(Boolean);
+
+  if (variant === 'push-a' || variant === 'push-b') {
+    var chestGroup   = exList.filter(function(e) { return e.muscle === 'chest'; });
+    var armsGroup    = exList.filter(function(e) { return e.muscle === 'triceps' || e.muscle === 'shoulders'; });
+    var otherGroup   = exList.filter(function(e) { return e.muscle !== 'chest' && e.muscle !== 'triceps' && e.muscle !== 'shoulders'; });
+    chestGroup  = shuffle(chestGroup);
+    armsGroup   = shuffle(armsGroup);
+    otherGroup  = shuffle(otherGroup);
+    exList = variant === 'push-a'
+      ? chestGroup.concat(armsGroup).concat(otherGroup)
+      : armsGroup.concat(chestGroup).concat(otherGroup);
+
+  } else if (variant === 'pull-a' || variant === 'pull-b') {
+    var backGroup  = exList.filter(function(e) { return e.muscle === 'back'; });
+    var armsGroup2 = exList.filter(function(e) { return e.muscle === 'biceps' || e.muscle === 'shoulders'; });
+    var otherGroup2 = exList.filter(function(e) { return e.muscle !== 'back' && e.muscle !== 'biceps' && e.muscle !== 'shoulders'; });
+    backGroup   = shuffle(backGroup);
+    armsGroup2  = shuffle(armsGroup2);
+    otherGroup2 = shuffle(otherGroup2);
+    exList = variant === 'pull-a'
+      ? backGroup.concat(armsGroup2).concat(otherGroup2)
+      : armsGroup2.concat(backGroup).concat(otherGroup2);
+
+  } else if (variant === 'legs') {
+    exList = shuffle(exList);
+  }
+
+  // Pick a random ab exercise and append
+  var absRot = rotations['abs'] || [];
+  var absExs = absRot.map(function(id) { return exercises.find(function(e) { return e.id === id; }); }).filter(Boolean);
+  if (absExs.length) {
+    var randomAb = absExs[Math.floor(Math.random() * absExs.length)];
+    // avoid duplicates
+    if (!exList.find(function(e) { return e.id === randomAb.id; })) {
+      exList.push(randomAb);
+    }
+  }
+
+  return exList;
+}
+
 function startWorkoutByType(variant) {
   var type = (variant.indexOf('push') === 0) ? 'push' : (variant.indexOf('pull') === 0) ? 'pull' : variant;
 
@@ -490,24 +534,12 @@ function startWorkoutByType(variant) {
     return;
   }
 
-  var rot  = rotations[variant] || [];
-  var list = [];
-  rot.forEach(function(id) {
-    var ex = exercises.find(function(e) { return e.id === id; });
-    if (ex) list.push(ex);
-  });
+  var list = buildExerciseList(variant);
 
   if (!list.length) {
     alert('No exercises in your ' + typeLabel(variant) + ' rotation yet.\n\nGo to Setup to add exercises.');
     return;
   }
-
-  // Append abs exercises
-  var absRot = rotations['abs'] || [];
-  absRot.forEach(function(id) {
-    var ex = exercises.find(function(e) { return e.id === id; });
-    if (ex) list.push(ex);
-  });
 
   var sets = {};
   list.forEach(function(ex) { sets[ex.id] = []; });
@@ -622,7 +654,21 @@ function renderExercise() {
 
   var nextLabel = (curIdx < total - 1) ? 'Done — Next Exercise' : 'Finish Workout';
 
+  // Build order list
+  var orderHTML = '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none">';
+  list.forEach(function(e, i) {
+    var isActive = i === curIdx;
+    var isDone   = i < curIdx;
+    var bg    = isDone ? 'var(--surface3)' : isActive ? 'var(--accent)' : 'var(--surface2)';
+    var color = isDone ? 'var(--muted)' : isActive ? '#0a0a0a' : 'var(--muted)';
+    var border = isActive ? 'none' : '1px solid var(--border)';
+    orderHTML += '<div style="flex-shrink:0;font-size:10px;font-weight:500;padding:4px 10px;border-radius:99px;background:' + bg + ';color:' + color + ';border:' + border + ';white-space:nowrap">' +
+      (isDone ? '&#10003; ' : '') + e.name + '</div>';
+  });
+  orderHTML += '</div>';
+
   area.innerHTML =
+    orderHTML +
     '<div class="exercise-card">' +
       '<div class="exercise-card-header">' +
         '<div class="exercise-card-name">' + ex.name.toUpperCase() + '</div>' +
@@ -641,7 +687,10 @@ function renderExercise() {
         '</div>' +
       '</div>' +
     '</div>' +
-    '<button class="btn btn-accent btn-full" onclick="nextExercise()">' + nextLabel + '</button>';
+    '<div style="display:flex;gap:8px;margin-bottom:8px">' +
+      '<button class="btn btn-accent" style="flex:1;padding:14px;font-size:15px" onclick="nextExercise()">' + nextLabel + '</button>' +
+      '<button class="btn btn-ghost" style="padding:14px 16px;font-size:13px;color:var(--muted)" onclick="skipExercise()">Skip</button>' +
+    '</div>';
 
   document.getElementById('wk-scroll').scrollTop = 0;
 }
@@ -663,6 +712,13 @@ function addSet() {
 function nextExercise() {
   activeWorkout.currentExIdx++;
   renderExercise();
+}
+
+function skipExercise() {
+  if (confirm('Are you sure you want to skip? You better have a good reason.')) {
+    activeWorkout.currentExIdx++;
+    renderExercise();
+  }
 }
 
 function finishLift() {
@@ -982,7 +1038,7 @@ function renderSetup() {
   }
 
   renderExLib();
-  ['push-a','push-b','pull-a','pull-b','legs','abs'].forEach(renderRotation);
+  ['push','pull','legs','abs'].forEach(renderRotation);
 }
 
 function renderExLib() {
@@ -1045,7 +1101,7 @@ function saveNewExercise() {
   }
 
   renderExLib();
-  ['push-a','push-b','pull-a','pull-b','legs','abs'].forEach(renderRotation);
+  ['push','pull','legs','abs'].forEach(renderRotation);
 }
 
 function deleteExercise(i) {
@@ -1086,7 +1142,7 @@ function deleteExercise(i) {
   }
 
   renderExLib();
-  ['push-a','push-b','pull-a','pull-b','legs','abs'].forEach(renderRotation);
+  ['push','pull','legs','abs'].forEach(renderRotation);
 }
 
 function renderRotation(key) {
@@ -1113,7 +1169,7 @@ function renderRotation(key) {
 }
 
 function addRotSlot(key) {
-  var catMap = {'push-a':'push','push-b':'push','pull-a':'pull','pull-b':'pull','legs':'legs','abs':'abs'};
+  var catMap = {'push':'push','pull':'pull','legs':'legs','abs':'abs'};
   var cat = catMap[key];
   var available = exercises.filter(function(e) {
     return e.cat === cat && rotations[key].indexOf(e.id) === -1;
