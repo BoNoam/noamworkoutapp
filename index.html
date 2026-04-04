@@ -263,12 +263,7 @@ canvas { display: block; width: 100% !important; }
       <div id="rot-legs"></div>
       <button class="btn btn-ghost mt8" style="font-size:12px;padding:7px 12px;width:100%" onclick="addRotSlot('legs')">+ Add exercise</button>
     </div>
-    <div class="card mb12">
-      <div class="section-header"><span class="section-label">Abs</span></div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Added to the end of every lifting workout</div>
-      <div id="rot-abs"></div>
-      <button class="btn btn-ghost mt8" style="font-size:12px;padding:7px 12px;width:100%" onclick="addRotSlot('abs')">+ Add exercise</button>
-    </div>
+
     <div style="height:20px"></div>
   </div>
 </div>
@@ -306,7 +301,6 @@ canvas { display: block; width: 100% !important; }
         <option value="back">Back</option>
         <option value="biceps">Biceps</option>
         <option value="legs">Legs</option>
-        <option value="abs">Abs</option>
       </select>
     </div>
     <div class="mb12"><label>Category</label>
@@ -314,7 +308,6 @@ canvas { display: block; width: 100% !important; }
         <option value="push">Push</option>
         <option value="pull">Pull</option>
         <option value="legs">Legs</option>
-        <option value="abs">Abs</option>
       </select>
     </div>
     <div class="row mt12">
@@ -329,6 +322,19 @@ canvas { display: block; width: 100% !important; }
   <div class="modal">
     <div id="history-detail-content"></div>
     <button class="btn btn-ghost btn-full mt12" onclick="closeModal('modal-history-detail')">Close</button>
+  </div>
+</div>
+
+<!-- ADD MID-WORKOUT EXERCISE MODAL -->
+<div class="modal-backdrop hidden" id="modal-mid-ex">
+  <div class="modal">
+    <div class="modal-title">Add Exercise</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Pick any exercise from your library</div>
+    <div class="mb12">
+      <input type="text" id="mid-ex-search" placeholder="Search exercises..." oninput="filterMidExList()" style="margin-bottom:8px">
+      <div id="mid-ex-list" style="max-height:260px;overflow-y:auto"></div>
+    </div>
+    <button class="btn btn-ghost btn-full" onclick="closeModal('modal-mid-ex')">Cancel</button>
   </div>
 </div>
 
@@ -350,7 +356,7 @@ function ss(k, v) {
 
 var schedule = ls('lft_schedule', {Mon:'push-a',Tue:'pull-a',Wed:'run',Thu:'push-b',Fri:'pull-b',Sat:'legs',Sun:'run'});
 var exercises  = ls('lft_exercises', []);
-var rotations  = ls('lft_rotations', {'push':[],'pull':[],'legs':[],'abs':[]});
+var rotations  = ls('lft_rotations', {'push':[],'pull':[],'legs':[]});
 var workoutLog = ls('lft_log',       []);
 var prs        = ls('lft_prs',       {});
 
@@ -509,17 +515,6 @@ function buildExerciseList(variant) {
 
   } else if (variant === 'legs') {
     exList = shuffle(exList);
-  }
-
-  // Pick a random ab exercise and append
-  var absRot = rotations['abs'] || [];
-  var absExs = absRot.map(function(id) { return exercises.find(function(e) { return e.id === id; }); }).filter(Boolean);
-  if (absExs.length) {
-    var randomAb = absExs[Math.floor(Math.random() * absExs.length)];
-    // avoid duplicates
-    if (!exList.find(function(e) { return e.id === randomAb.id; })) {
-      exList.push(randomAb);
-    }
   }
 
   return exList;
@@ -690,6 +685,7 @@ function renderExercise() {
     '<div style="display:flex;gap:8px;margin-bottom:8px">' +
       '<button class="btn btn-accent" style="flex:1;padding:14px;font-size:15px" onclick="nextExercise()">' + nextLabel + '</button>' +
       '<button class="btn btn-ghost" style="padding:14px 16px;font-size:13px;color:var(--muted)" onclick="skipExercise()">Skip</button>' +
+      '<button class="btn btn-ghost" style="padding:14px 16px;font-size:13px;color:var(--muted)" onclick="openAddMidModal()">+</button>' +
     '</div>';
 
   document.getElementById('wk-scroll').scrollTop = 0;
@@ -719,6 +715,49 @@ function skipExercise() {
     activeWorkout.currentExIdx++;
     renderExercise();
   }
+}
+
+function openAddMidModal() {
+  filterMidExList();
+  document.getElementById('mid-ex-search').value = '';
+  filterMidExList();
+  document.getElementById('modal-mid-ex').classList.remove('hidden');
+}
+
+function filterMidExList() {
+  var query = (document.getElementById('mid-ex-search').value || '').toLowerCase();
+  var list  = document.getElementById('mid-ex-list');
+  list.innerHTML = '';
+  var filtered = exercises.filter(function(e) {
+    return !query || e.name.toLowerCase().indexOf(query) > -1 || e.muscle.toLowerCase().indexOf(query) > -1;
+  });
+  if (!filtered.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:12px 0;text-align:center">No exercises found</div>';
+    return;
+  }
+  filtered.forEach(function(ex) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer';
+    row.innerHTML =
+      '<div>' +
+        '<div style="font-size:14px;font-weight:500">' + ex.name + '</div>' +
+        '<div style="font-size:11px;color:var(--muted)">' + ex.muscle + ' / ' + ex.cat + '</div>' +
+      '</div>' +
+      '<button class="btn btn-ghost" style="font-size:12px;padding:6px 12px">Add</button>';
+    row.querySelector('button').onclick = function() { addMidWorkoutExercise(ex.id); };
+    list.appendChild(row);
+  });
+}
+
+function addMidWorkoutExercise(exId) {
+  var ex = exercises.find(function(e) { return e.id === exId; });
+  if (!ex) return;
+  // Insert after current exercise
+  var insertAt = activeWorkout.currentExIdx + 1;
+  activeWorkout.exerciseList.splice(insertAt, 0, ex);
+  if (!activeWorkout.sets[ex.id]) activeWorkout.sets[ex.id] = [];
+  closeModal('modal-mid-ex');
+  renderExercise();
 }
 
 function finishLift() {
@@ -1038,7 +1077,7 @@ function renderSetup() {
   }
 
   renderExLib();
-  ['push','pull','legs','abs'].forEach(renderRotation);
+  ['push','pull','legs'].forEach(renderRotation);
 }
 
 function renderExLib() {
@@ -1101,7 +1140,7 @@ function saveNewExercise() {
   }
 
   renderExLib();
-  ['push','pull','legs','abs'].forEach(renderRotation);
+  ['push','pull','legs'].forEach(renderRotation);
 }
 
 function deleteExercise(i) {
@@ -1142,7 +1181,7 @@ function deleteExercise(i) {
   }
 
   renderExLib();
-  ['push','pull','legs','abs'].forEach(renderRotation);
+  ['push','pull','legs'].forEach(renderRotation);
 }
 
 function renderRotation(key) {
@@ -1169,7 +1208,7 @@ function renderRotation(key) {
 }
 
 function addRotSlot(key) {
-  var catMap = {'push':'push','pull':'pull','legs':'legs','abs':'abs'};
+  var catMap = {'push':'push','pull':'pull','legs':'legs'};
   var cat = catMap[key];
   var available = exercises.filter(function(e) {
     return e.cat === cat && rotations[key].indexOf(e.id) === -1;
