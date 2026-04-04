@@ -360,6 +360,7 @@ function ss(k, v) {
 var schedule = ls('lft_schedule', {Mon:'push-a',Tue:'pull-a',Wed:'run',Thu:'push-b',Fri:'pull-b',Sat:'legs',Sun:'run'});
 var exercises  = ls('lft_exercises', []);
 var rotations  = ls('lft_rotations', {'push':[],'pull':[],'legs':[]});
+var exHistory  = ls('lft_ex_history', {}); // {muscleKey: [exId, exId, ...]} most recent first
 var workoutLog = ls('lft_log',       []);
 var prs        = ls('lft_prs',       {});
 
@@ -486,41 +487,84 @@ function shuffle(arr) {
   return a;
 }
 
+// Smart pick: given a pool of exercises for one muscle group,
+// return up to `count` exercises avoiding recently used ones first
+function smartPick(pool, muscle, count) {
+  if (!pool.length) return [];
+  var history = exHistory[muscle] || [];
+  // Sort by how recently used: not in history = 0 (fresh), recently used = high index
+  var scored = pool.map(function(ex) {
+    var idx = history.indexOf(ex.id);
+    return { ex: ex, score: idx === -1 ? -1 : idx };
+  });
+  // Sort ascending: unseen (-1) first, then least recently used (lowest index = oldest)
+  scored.sort(function(a, b) {
+    if (a.score === -1 && b.score === -1) return Math.random() - 0.5;
+    if (a.score === -1) return -1;
+    if (b.score === -1) return 1;
+    return a.score - b.score;
+  });
+  return scored.slice(0, count).map(function(s) { return s.ex; });
+}
+
 function buildExerciseList(variant) {
   var baseKey = variant === 'push-a' || variant === 'push-b' ? 'push' :
-                variant === 'pull-a' || variant === 'pull-b' ? 'pull' :
-                variant; // legs
+                variant === 'pull-a' || variant === 'pull-b' ? 'pull' : 'legs';
 
-  var rot = rotations[baseKey] || [];
-  var exList = rot.map(function(id) { return exercises.find(function(e) { return e.id === id; }); }).filter(Boolean);
+  var rot    = rotations[baseKey] || [];
+  var allEx  = rot.map(function(id) { return exercises.find(function(e) { return e.id === id; }); }).filter(Boolean);
 
-  if (variant === 'push-a' || variant === 'push-b') {
-    var chestGroup   = exList.filter(function(e) { return e.muscle === 'chest'; });
-    var armsGroup    = exList.filter(function(e) { return e.muscle === 'triceps' || e.muscle === 'shoulders'; });
-    var otherGroup   = exList.filter(function(e) { return e.muscle !== 'chest' && e.muscle !== 'triceps' && e.muscle !== 'shoulders'; });
-    chestGroup  = shuffle(chestGroup);
-    armsGroup   = shuffle(armsGroup);
-    otherGroup  = shuffle(otherGroup);
-    exList = variant === 'push-a'
-      ? chestGroup.concat(armsGroup).concat(otherGroup)
-      : armsGroup.concat(chestGroup).concat(otherGroup);
+  var picked = [];
 
-  } else if (variant === 'pull-a' || variant === 'pull-b') {
-    var backGroup  = exList.filter(function(e) { return e.muscle === 'back'; });
-    var armsGroup2 = exList.filter(function(e) { return e.muscle === 'biceps' || e.muscle === 'shoulders'; });
-    var otherGroup2 = exList.filter(function(e) { return e.muscle !== 'back' && e.muscle !== 'biceps' && e.muscle !== 'shoulders'; });
-    backGroup   = shuffle(backGroup);
-    armsGroup2  = shuffle(armsGroup2);
-    otherGroup2 = shuffle(otherGroup2);
-    exList = variant === 'pull-a'
-      ? backGroup.concat(armsGroup2).concat(otherGroup2)
-      : armsGroup2.concat(backGroup).concat(otherGroup2);
+  if (baseKey === 'push') {
+    // Groups: chest (2), triceps (2), shoulders (2) = 6 total
+    var chestPool     = allEx.filter(function(e) { return e.muscle === 'chest'; });
+    var tricepsPool   = allEx.filter(function(e) { return e.muscle === 'triceps'; });
+    var shoulderPool  = allEx.filter(function(e) { return e.muscle === 'shoulders'; });
+    var chestPicked   = smartPick(chestPool,   'chest',     2);
+    var tricepsPicked = smartPick(tricepsPool,  'triceps',   2);
+    var shoulderPicked= smartPick(shoulderPool, 'shoulders', 2);
+    // A: chest first, B: triceps+shoulders first
+    if (variant === 'push-a') {
+      picked = chestPicked.concat(shuffle(tricepsPicked.concat(shoulderPicked)));
+    } else {
+      picked = shuffle(tricepsPicked.concat(shoulderPicked)).concat(chestPicked);
+    }
 
-  } else if (variant === 'legs') {
-    exList = shuffle(exList);
+  } else if (baseKey === 'pull') {
+    // Groups: back (3), biceps (2), shoulders (1) = 6 total
+    var backPool    = allEx.filter(function(e) { return e.muscle === 'back'; });
+    var bicepsPool  = allEx.filter(function(e) { return e.muscle === 'biceps'; });
+    var shouldPool  = allEx.filter(function(e) { return e.muscle === 'shoulders'; });
+    var backPicked    = smartPick(backPool,    'back',      3);
+    var bicepsPicked  = smartPick(bicepsPool,  'biceps',    2);
+    var shouldPicked  = smartPick(shouldPool,  'shoulders', 1);
+    if (variant === 'pull-a') {
+      picked = backPicked.concat(shuffle(bicepsPicked.concat(shouldPicked)));
+    } else {
+      picked = shuffle(bicepsPicked.concat(shouldPicked)).concat(backPicked);
+    }
+
+  } else {
+    // Legs: pick 5 total, all from legs pool, smart rotation
+    var legPool = allEx.filter(function(e) { return e.muscle === 'legs'; });
+    picked = smartPick(legPool, 'legs', 5);
   }
 
-  return exList;
+  return picked.filter(Boolean);
+}
+
+// Call this after saving a workout to update history
+function updateExHistory(exerciseList) {
+  exerciseList.forEach(function(ex) {
+    if (!exHistory[ex.muscle]) exHistory[ex.muscle] = [];
+    // Remove if already in history, then prepend (most recent first)
+    exHistory[ex.muscle] = exHistory[ex.muscle].filter(function(id) { return id !== ex.id; });
+    exHistory[ex.muscle].unshift(ex.id);
+    // Keep last 20 per muscle
+    exHistory[ex.muscle] = exHistory[ex.muscle].slice(0, 20);
+  });
+  ss('lft_ex_history', exHistory);
 }
 
 function startWorkoutByType(variant) {
@@ -770,6 +814,7 @@ function finishLift() {
 
   workoutLog.unshift({ uid: uid(), type: activeWorkout.variant, date: activeWorkout.date, exercises: exList });
   ss('lft_log', workoutLog);
+  updateExHistory(exList);
   activeWorkout = null;
 
   document.getElementById('wk-exercise-area').innerHTML =
