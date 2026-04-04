@@ -271,9 +271,15 @@ canvas { display: block; width: 100% !important; }
     </div>
     <div class="card mb12">
       <div class="section-header"><span class="section-label">Legs Day</span></div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Quads, hamstrings, shoulders</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">All leg exercises</div>
       <div id="rot-legs"></div>
       <button class="btn btn-ghost mt8" style="font-size:12px;padding:7px 12px;width:100%" onclick="addRotSlot('legs')">+ Add exercise</button>
+    </div>
+    <div class="card mb12">
+      <div class="section-header"><span class="section-label">Abs</span></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Added to the end of every lifting workout</div>
+      <div id="rot-abs"></div>
+      <button class="btn btn-ghost mt8" style="font-size:12px;padding:7px 12px;width:100%" onclick="addRotSlot('abs')">+ Add exercise</button>
     </div>
     <div style="height:20px"></div>
   </div>
@@ -312,10 +318,8 @@ canvas { display: block; width: 100% !important; }
         <option value="back">Back</option>
         <option value="biceps">Biceps</option>
         <option value="rear-delts">Rear Delts</option>
-        <option value="quads">Quads</option>
-        <option value="hamstrings">Hamstrings</option>
-        <option value="glutes">Glutes</option>
-        <option value="calves">Calves</option>
+        <option value="legs">Legs</option>
+        <option value="abs">Abs</option>
       </select>
     </div>
     <div class="mb12"><label>Category</label>
@@ -323,6 +327,7 @@ canvas { display: block; width: 100% !important; }
         <option value="push">Push</option>
         <option value="pull">Pull</option>
         <option value="legs">Legs</option>
+        <option value="abs">Abs</option>
       </select>
     </div>
     <div class="row mt12">
@@ -358,7 +363,7 @@ function ss(k, v) {
 
 var schedule = ls('lft_schedule', {Mon:'push-a',Tue:'pull-a',Wed:'run',Thu:'push-b',Fri:'pull-b',Sat:'legs',Sun:'run'});
 var exercises  = ls('lft_exercises', []);
-var rotations  = ls('lft_rotations', {'push-a':[],'push-b':[],'pull-a':[],'pull-b':[],'legs':[]});
+var rotations  = ls('lft_rotations', {'push-a':[],'push-b':[],'pull-a':[],'pull-b':[],'legs':[],'abs':[]});
 var workoutLog = ls('lft_log',       []);
 var prs        = ls('lft_prs',       {});
 
@@ -496,6 +501,13 @@ function startWorkoutByType(variant) {
     alert('No exercises in your ' + typeLabel(variant) + ' rotation yet.\n\nGo to Setup to add exercises.');
     return;
   }
+
+  // Append abs exercises
+  var absRot = rotations['abs'] || [];
+  absRot.forEach(function(id) {
+    var ex = exercises.find(function(e) { return e.id === id; });
+    if (ex) list.push(ex);
+  });
 
   var sets = {};
   list.forEach(function(ex) { sets[ex.id] = []; });
@@ -970,7 +982,7 @@ function renderSetup() {
   }
 
   renderExLib();
-  ['push-a','push-b','pull-a','pull-b','legs'].forEach(renderRotation);
+  ['push-a','push-b','pull-a','pull-b','legs','abs'].forEach(renderRotation);
 }
 
 function renderExLib() {
@@ -1033,7 +1045,7 @@ function saveNewExercise() {
   }
 
   renderExLib();
-  ['push-a','push-b','pull-a','pull-b','legs'].forEach(renderRotation);
+  ['push-a','push-b','pull-a','pull-b','legs','abs'].forEach(renderRotation);
 }
 
 function deleteExercise(i) {
@@ -1044,6 +1056,7 @@ function deleteExercise(i) {
   Object.keys(rotations).forEach(function(k) {
     rotations[k] = rotations[k].filter(function(x) { return x !== exId; });
   });
+  if (!rotations['abs']) rotations['abs'] = [];
   ss('lft_rotations', rotations);
   // Schedule rows
   var rows = document.getElementById('schedule-rows');
@@ -1073,7 +1086,7 @@ function deleteExercise(i) {
   }
 
   renderExLib();
-  ['push-a','push-b','pull-a','pull-b','legs'].forEach(renderRotation);
+  ['push-a','push-b','pull-a','pull-b','legs','abs'].forEach(renderRotation);
 }
 
 function renderRotation(key) {
@@ -1100,7 +1113,7 @@ function renderRotation(key) {
 }
 
 function addRotSlot(key) {
-  var catMap = {'push-a':'push','push-b':'push','pull-a':'pull','pull-b':'pull','legs':'legs'};
+  var catMap = {'push-a':'push','push-b':'push','pull-a':'pull','pull-b':'pull','legs':'legs','abs':'abs'};
   var cat = catMap[key];
   var available = exercises.filter(function(e) {
     return e.cat === cat && rotations[key].indexOf(e.id) === -1;
